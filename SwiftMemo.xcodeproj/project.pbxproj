@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C351A7172A4B5D5A00FA7873 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = C351A7162A4B5D5A00FA7873 /* GoogleService-Info.plist */; };
 		C574F7BD2A48C1A700471972 /* SwiftMemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C574F7BC2A48C1A700471972 /* SwiftMemoApp.swift */; };
 		C574F7BF2A48C1A700471972 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C574F7BE2A48C1A700471972 /* ContentView.swift */; };
 		C574F7C12A48C1A800471972 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C574F7C02A48C1A800471972 /* Assets.xcassets */; };
@@ -42,6 +43,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		C351A7162A4B5D5A00FA7873 /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		C574F7B92A48C1A700471972 /* SwiftMemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SwiftMemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C574F7BC2A48C1A700471972 /* SwiftMemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftMemoApp.swift; sourceTree = "<group>"; };
 		C574F7BE2A48C1A700471972 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -112,6 +114,7 @@
 			isa = PBXGroup;
 			children = (
 				C574F7F62A48D6D300471972 /* GoogleService-Info.plist */,
+				C351A7162A4B5D5A00FA7873 /* GoogleService-Info.plist */,
 				C574F7BC2A48C1A700471972 /* SwiftMemoApp.swift */,
 				C574F7BE2A48C1A700471972 /* ContentView.swift */,
 				C574F7C02A48C1A800471972 /* Assets.xcassets */,
@@ -263,6 +266,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C574F7C52A48C1A800471972 /* Preview Assets.xcassets in Resources */,
+				C351A7172A4B5D5A00FA7873 /* GoogleService-Info.plist in Resources */,
 				C574F7C12A48C1A800471972 /* Assets.xcassets in Resources */,
 				C574F7F72A48D6D300471972 /* GoogleService-Info.plist in Resources */,
 			);
