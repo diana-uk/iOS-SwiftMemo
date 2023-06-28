@@ -23,6 +23,7 @@ struct ContentView: View {
                 .navigationBarItems(trailing: addButton)
         }
         .sheet(isPresented: $showAddReminder) {
+
             AddReminderView(reminders: $reminders)
         }
         #else
@@ -35,12 +36,15 @@ struct ContentView: View {
                 }
             }
         #endif
+        
+
     }
     
     init() {
-        FirebaseApp.configure() // Initialize Firebase
-        fetchReminders()
-    }
+          FirebaseApp.configure() // Initialize Firebase
+          fetchReminders()
+      
+      }
     
     func fetchReminders() {
         let databaseRef = Database.database().reference().child("reminders")
@@ -76,8 +80,7 @@ struct ContentView: View {
     var content: some View {
         List {
             ForEach(reminders) { reminder in
-                ReminderRow(reminder: reminder, selectedImage: reminder.image, reminders: $reminders) // Pass the selected image and the reminders binding
-
+                ReminderRow(reminder: reminder, selectedImage: reminder.image, reminders: $reminders)
             }
         }
     }
@@ -93,13 +96,12 @@ struct ContentView: View {
 
 struct ReminderRow: View {
     @State private var isChecked = false
-    @State private var isLongPressed = false // Add this line
-    @State private var showAlert = false // Add this line
-
+    @State private var isLongPressed = false
+    @State private var showAlert = false
+    
     let reminder: Reminder
-    let selectedImage: UIImage? // Add this line
-    @Binding var reminders: [Reminder] // Add this line
-
+    let selectedImage: UIImage?
+    @Binding var reminders: [Reminder]
     
     var body: some View {
         HStack {
@@ -114,274 +116,145 @@ struct ReminderRow: View {
                 Text(reminder.title)
                     .font(.headline)
                     .foregroundColor(isChecked ? .gray : .primary)
-                    .animation(.easeInOut) // Animation for description line
-                    .strikethrough(isChecked) // Add line when checked
-                    .opacity(isChecked ? 0.6 : 1.0) // Reduce opacity when checked
+                    .animation(.easeInOut)
+                    .strikethrough(isChecked)
+                    .opacity(isChecked ? 0.6 : 1.0)
                 Text(reminder.description)
                     .font(.subheadline)
-                    .foregroundColor(isChecked ? .gray : .primary)
-                    .animation(.easeInOut) // Animation for description line
-                    .strikethrough(isChecked) // Add line when checked
-                    .opacity(isChecked ? 0.6 : 1.0) // Reduce opacity when checked
+                    .foregroundColor(isChecked ? .gray : .secondary)
+                    .animation(.easeInOut)
+                    .strikethrough(isChecked)
+                    .opacity(isChecked ? 0.6 : 1.0)
+                Text(reminder.timestamp, style: .relative)
+                    .font(.caption)
+                    .foregroundColor(isChecked ? .gray : .secondary)
+                    .animation(.easeInOut)
+                    .strikethrough(isChecked)
+                    .opacity(isChecked ? 0.6 : 1.0)
             }
             
-            Spacer()
-            Circle()
-                .frame(width: 40, height: 40)
-                .overlay(
-                    Image(uiImage: selectedImage ?? UIImage(systemName: "camera")!) // Display the selected image or a default system image
-                        .resizable()
-                        .scaledToFill()
-                        .clipShape(Circle())
-                )
+            if let selectedImage = selectedImage {
+                Image(uiImage: selectedImage)
+                    .resizable()
+                    .frame(width: 40, height: 40)
+                    .clipShape(Circle())
+                    .overlay(Circle().stroke(Color.gray, lineWidth: 1))
+            }
         }
-        .background(isLongPressed ? Color.red.opacity(0.2) : Color.clear) // Add this line
-        .onLongPressGesture(minimumDuration: 3.0) {
+        .padding(.vertical, 8)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            isChecked.toggle()
+        }
+        .onLongPressGesture {
             isLongPressed = true
-            showAlert = true
         }
-        .actionSheet(isPresented: $showAlert) {
-            ActionSheet(title: Text("Delete Reminder?"), buttons: [
-                .destructive(Text("Yes"), action: {
-                    // Delete the reminder permanently
+        .alert(isPresented: $showAlert) {
+            Alert(
+                title: Text("Delete Reminder"),
+                message: Text("Are you sure you want to delete this reminder?"),
+                primaryButton: .destructive(Text("Delete")) {
                     deleteReminder()
-                }),
-                .cancel(Text("No"), action: {
-                    // Keep the reminder and dismiss the alert
-                    isLongPressed = false
-                    showAlert = false
-                })
-            ])
+                },
+                secondaryButton: .cancel()
+            )
+        }
+        .actionSheet(isPresented: $isLongPressed) {
+            ActionSheet(
+                title: Text("Reminder Actions"),
+                message: nil,
+                buttons: [
+                    .default(Text("Edit")) {
+                        // Handle edit action
+                    },
+                    .destructive(Text("Delete")) {
+                        showAlert = true
+                    },
+                    .cancel()
+                ]
+            )
         }
     }
     
     func deleteReminder() {
-           let databaseRef = Database.database().reference().child("reminders").child(reminder.id.uuidString)
-           
-           databaseRef.removeValue { error, _ in
-               if let error = error {
-                   print("Error deleting reminder from Firebase: \(error)")
-               }
-               // Remove the reminder from the local array
-               if let index = reminders.firstIndex(where: { $0.id == reminder.id }) {
-                   reminders.remove(at: index)
-               }
-               // Reset the long press and alert state
-               isLongPressed = false
-               showAlert = false
-           }
-       }
-
+        reminders.removeAll { $0.id == reminder.id }
+    }
 }
-
 
 struct AddReminderView: View {
     @Environment(\.presentationMode) var presentationMode
-    @Binding var reminders: [Reminder]
-    
     @State private var title = ""
     @State private var description = ""
-    @State private var selectedImage: UIImage? = nil
-    @State private var showImagePicker = false
-    @State private var creationTimestamp = Date()
-    @State private var showDescriptionError = false
-    @State private var isAnimating = false
+    @State private var selectedImage: UIImage?
+    @Binding var reminders: [Reminder]
     
     var body: some View {
         NavigationView {
             Form {
                 Section(header: Text("Reminder Details")) {
                     TextField("Title", text: $title)
-                    
-                    TextEditor(text: $description)
-                        .frame(height: 120) // Set desired height for the description TextEditor
+                    TextField("Description", text: $description)
                 }
                 
-                if showDescriptionError {
-                    Section {
-                        Text("Description of the reminder cannot be empty!")
-                            .foregroundColor(.red)
-                            .font(.footnote)
-                    }
-                }
-                
-                Section {
-                    if selectedImage != nil {
-                        Image(uiImage: selectedImage!)
+                Section(header: Text("Image")) {
+                    if let selectedImage = selectedImage {
+                        Image(uiImage: selectedImage)
                             .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 120, height: 120)
-                            .clipShape(Circle())
-                    } else {
-                        Button(action: {
-                            showImagePicker = true
-                        }) {
-                            Image(systemName: "camera")
-                                .font(.title)
-                                .frame(width: 120, height: 120)
-                                .background(Color.gray.opacity(0.2))
-                                .clipShape(Circle())
-                        }
+                            .scaledToFit()
                     }
-                }
-                
-                Section {
-                    Text("Created: \(creationTimestamp, formatter: DateFormatter.timestampFormatter)")
-                        .foregroundColor(.gray)
-                }
-                
-                Section {
-                    Button(action: addReminder) {
-                        HStack {
-                            Image(systemName: "square.and.arrow.down")
-                                .font(.title)
-                            Text("Save")
-                                .font(.headline)
-                        }
-                        .padding()
-                        .background(Color.green)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
-                        .overlay(
-                            Group {
-                                if isAnimating {
-                                    Circle()
-                                        .stroke(Color.green, lineWidth: 4)
-                                        .scaleEffect(0.8)
-                                        .opacity(isAnimating ? 1 : 0)
-                                        .animation(Animation.easeInOut(duration: 1.0).repeatForever(autoreverses: false))
-                                }
-                            }
-                        )
+                    
+                    Button(action: {
+                        // Handle image selection
+                    }) {
+                        Text("Select Image")
                     }
                 }
             }
-            .navigationBarTitle("New Reminder")
-            .navigationBarItems(trailing: Button("Done", action: dismiss))
-            .onAppear {
-                isAnimating = true
-            }
-        }
-        .sheet(isPresented: $showImagePicker) {
-            ImagePicker(selectedImage: $selectedImage)
+            .navigationTitle("Add Reminder")
+            .navigationBarItems(
+                leading: cancelButton,
+                trailing: saveButton
+            )
         }
     }
     
-    func addReminder() {
-        if title.isEmpty {
-            title = "Empty Title"
+    var cancelButton: some View {
+        Button(action: {
+            presentationMode.wrappedValue.dismiss()
+        }) {
+            Text("Cancel")
         }
-        
-        if description.isEmpty {
-            showDescriptionError = true
-            return
-        }
-        
-        let newReminder = Reminder(title: title, description: description, timestamp: creationTimestamp, image: selectedImage)
-        reminders.append(newReminder)
-        
-        saveReminderToFirebase(newReminder) // Save reminder to Firebase
-        
-        dismiss()
     }
     
-    func saveReminderToFirebase(_ reminder: Reminder) {
+    var saveButton: some View {
+        Button(action: {
+            saveReminder()
+            presentationMode.wrappedValue.dismiss()
+        }) {
+            Text("Save")
+        }
+    }
+    
+    func saveReminder() {
         let databaseRef = Database.database().reference().child("reminders").childByAutoId()
+        let timestamp = Date().timeIntervalSince1970
         
-        var reminderData: [String: Any] = [
-            "title": reminder.title,
-            "description": reminder.description,
-            "timestamp": reminder.timestamp.timeIntervalSince1970
+        let reminderData: [String: Any] = [
+            "title": title,
+            "description": description,
+            "timestamp": timestamp,
+            "imageURL": "" // Replace with the URL of the selected image
         ]
         
-        if let imageData = reminder.image?.jpegData(compressionQuality: 0.8) {
-            let storageRef = Storage.storage().reference().child("images").child(databaseRef.key!)
-            storageRef.putData(imageData, metadata: nil) { _, error in
-                if let error = error {
-                    print("Error uploading image: \(error)")
-                    return
-                }
-                
-                storageRef.downloadURL { url, error in
-                    if let error = error {
-                        print("Error fetching download URL: \(error)")
-                        return
-                    }
-                    
-                    guard let downloadURL = url else {
-                        print("Download URL is nil.")
-                        return
-                    }
-                    
-                    reminderData["imageURL"] = downloadURL.absoluteString
-                    
-                    databaseRef.setValue(reminderData) { error, _ in
-                        if let error = error {
-                            print("Error saving reminder to Firebase: \(error)")
-                        }
-                    }
-                }
-            }
-        } else {
-            databaseRef.setValue(reminderData) { error, _ in
-                if let error = error {
-                    print("Error saving reminder to Firebase: \(error)")
-                }
+        databaseRef.setValue(reminderData) { error, _ in
+            if let error = error {
+                print("Error saving reminder: \(error.localizedDescription)")
+            } else {
+                let reminder = Reminder(title: title, description: description, timestamp: Date(timeIntervalSince1970: timestamp), image: selectedImage)
+                reminders.append(reminder)
             }
         }
     }
-    
-    func dismiss() {
-        presentationMode.wrappedValue.dismiss()
-    }
-}
-
-struct ImagePicker: UIViewControllerRepresentable {
-    @Environment(\.presentationMode) var presentationMode
-    @Binding var selectedImage: UIImage?
-    
-    class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
-        let parent: ImagePicker
-        
-        init(_ parent: ImagePicker) {
-            self.parent = parent
-        }
-        
-        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
-            if let selectedImage = info[.originalImage] as? UIImage {
-                parent.selectedImage = selectedImage
-            }
-            
-            parent.presentationMode.wrappedValue.dismiss()
-        }
-        
-        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
-            parent.presentationMode.wrappedValue.dismiss()
-        }
-    }
-    
-    func makeCoordinator() -> Coordinator {
-        Coordinator(self)
-    }
-    
-    func makeUIViewController(context: UIViewControllerRepresentableContext<ImagePicker>) -> UIImagePickerController {
-        let imagePickerController = UIImagePickerController()
-        imagePickerController.delegate = context.coordinator
-        return imagePickerController
-    }
-    
-    func updateUIViewController(_ uiViewController: UIImagePickerController, context: UIViewControllerRepresentableContext<ImagePicker>) {
-        // No update needed
-    }
-}
-
-extension DateFormatter {
-    static let timestampFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-        return formatter
-    }()
 }
 
 struct ContentView_Previews: PreviewProvider {
