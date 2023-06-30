@@ -98,6 +98,7 @@ struct ReminderRow: View {
     @State private var isChecked = false
     @State private var isLongPressed = false
     @State private var showAlert = false
+    @State private var isEditing = false
     
     let reminder: Reminder
     let selectedImage: UIImage?
@@ -165,7 +166,7 @@ struct ReminderRow: View {
                 message: nil,
                 buttons: [
                     .default(Text("Edit")) {
-                        // Handle edit action
+                        isEditing = true
                     },
                     .destructive(Text("Delete")) {
                         showAlert = true
@@ -174,12 +175,93 @@ struct ReminderRow: View {
                 ]
             )
         }
+        .sheet(isPresented: $isEditing) {
+                   EditReminderView(reminder: reminder, selectedImage: selectedImage, reminders: $reminders)
+               }
     }
     
     func deleteReminder() {
         reminders.removeAll { $0.id == reminder.id }
     }
 }
+
+struct EditReminderView: View {
+    @Environment(\.presentationMode) var presentationMode
+    @State private var title: String
+    @State private var description: String
+    @State private var selectedImage: UIImage?
+    @Binding var reminders: [Reminder]
+    
+    let reminder: Reminder
+    
+    init(reminder: Reminder, selectedImage: UIImage?, reminders: Binding<[Reminder]>) {
+        self.reminder = reminder
+        self._title = State(initialValue: reminder.title)
+        self._description = State(initialValue: reminder.description)
+        self._selectedImage = State(initialValue: selectedImage)
+        self._reminders = reminders
+    }
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                Section(header: Text("Reminder Details")) {
+                    TextField("Title", text: $title)
+                    TextField("Description", text: $description)
+                }
+                
+                Section(header: Text("Image")) {
+                    if let selectedImage = selectedImage {
+                        Image(uiImage: selectedImage)
+                            .resizable()
+                            .scaledToFit()
+                    }
+                    
+                    Button(action: {
+                        // Handle image selection
+                    }) {
+                        Text("Select Image")
+                    }
+                }
+            }
+            .navigationTitle("Edit Reminder")
+            .navigationBarItems(
+                leading: cancelButton,
+                trailing: saveButton
+            )
+        }
+        .onAppear {
+            title = reminder.title
+            description = reminder.description
+            // Assign selectedImage from reminder.image if necessary
+        }
+    }
+    
+    var cancelButton: some View {
+        Button(action: {
+            presentationMode.wrappedValue.dismiss()
+        }) {
+            Text("Cancel")
+        }
+    }
+    
+    var saveButton: some View {
+          Button(action: {
+              updateReminder()
+              presentationMode.wrappedValue.dismiss()
+          }) {
+              Text("Save")
+          }
+      }
+    
+    func updateReminder() {
+          // Find the index of the reminder in the reminders array
+          if let index = reminders.firstIndex(where: { $0.id == reminder.id }) {
+              let updatedReminder = Reminder(title: title, description: description, timestamp: reminder.timestamp, image: selectedImage)
+              reminders[index] = updatedReminder
+          }
+      }
+  }
 
 struct AddReminderView: View {
     @Environment(\.presentationMode) var presentationMode
