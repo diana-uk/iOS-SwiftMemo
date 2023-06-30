@@ -9,9 +9,9 @@ struct Reminder: Identifiable {
     let description: String
     let timestamp: Date
     let image: UIImage?
-    
-    
-    init(id: UUID?, title: String, description: String, timestamp: Date, image: UIImage?) {
+    var isChecked: Bool // Add isChecked field to the struct
+
+    init(id: UUID?, title: String, description: String, timestamp: Date, image: UIImage?, isChecked: Bool = false) { // Provide a default value for isChecked
         if let id = id {
             self.id = id
         } else {
@@ -21,6 +21,7 @@ struct Reminder: Identifiable {
         self.description = description
         self.timestamp = timestamp
         self.image = image
+        self.isChecked = isChecked // Initialize isChecked with the provided value or false by default
     }
 }
 
@@ -71,7 +72,7 @@ struct ContentView: View {
                 print("Error fetching reminders: \(error)")
                 return
             }
-                   var newReminders: [Reminder] = []
+             var newReminders: [Reminder] = []
             
              for child in snapshot.children {
                  if let snapshot = child as? DataSnapshot,
@@ -79,6 +80,7 @@ struct ContentView: View {
                     let id = reminderData["id"] as? String,
                     let title = reminderData["title"] as? String,
                     let description = reminderData["description"] as? String,
+                    let isChecked = reminderData["isChecked"] as? Bool,
                     let timestamp = reminderData["timestamp"] as? TimeInterval {
                     
                      let imageURL = URL(string: reminderData["imageURL"] as? String ?? "")
@@ -89,7 +91,7 @@ struct ContentView: View {
                          }
                          return nil
                      }
-                     let reminder = Reminder(id: UUID(uuidString: id), title: title, description: description, timestamp: Date(timeIntervalSince1970: timestamp), image: image)
+                     let reminder = Reminder(id: UUID(uuidString: id), title: title, description: description, timestamp: Date(timeIntervalSince1970: timestamp), image: image, isChecked: isChecked) // Update the initializer
                     
                      newReminders.append(reminder)
                  }
@@ -117,6 +119,7 @@ struct ContentView: View {
                 HStack {
                     Button(action: {
                         isChecked.toggle()
+                        updateIsChecked(isChecked: Bool())
                     }) {
                         Image(systemName: isChecked ? "checkmark.square.fill" : "square")
                     }
@@ -135,7 +138,7 @@ struct ContentView: View {
                             .animation(.easeInOut)
                             .strikethrough(isChecked)
                             .opacity(isChecked ? 0.6 : 1.0)
-                        Text("\(timeAgoSince(reminder.timestamp))")
+                        Text("\(formattedDate((reminder.timestamp)))")
                                        .font(.caption)
                                        .foregroundColor(isChecked ? .gray : .secondary)
                                        .animation(.easeInOut)
@@ -206,17 +209,42 @@ struct ContentView: View {
                                 reminders.removeAll { $0.id == reminder.id }
                             }
                         }
-                
-                
             }
+            
+            func updateIsChecked(isChecked:Bool) {
+                let databaseRef = Database.database().reference().child("reminders").child(reminder.id.uuidString) // Use existing reminder ID
+
+                let updatedReminderData: [String: Any] = [
+                    "title": reminder.title,
+                    "description": reminder.description,
+                    "isChecked": isChecked,
+                    "timestamp": reminder.timestamp.timeIntervalSince1970,
+                    "imageURL": "" // Replace with the URL of the selected image
+                ]
+
+                databaseRef.updateChildValues(updatedReminderData) { error, _ in
+                    if let error = error {
+                        print("Error updating reminder: \(error.localizedDescription)")
+                    } else {
+                        if let index = reminders.firstIndex(where: { $0.id == reminder.id }) {
+                            let updatedReminder =
+                            Reminder(id: reminder.id,
+                                     title: reminder.title, description: reminder.description, timestamp: reminder.timestamp, image: selectedImage,isChecked: reminder.isChecked)
+                            reminders[index] = updatedReminder
+                        }
+                    }
+                }
+            }
+                   
             
             struct EditReminderView: View {
                 @Environment(\.presentationMode) var presentationMode
                 @State private var title: String
                 @State private var description: String
                 @State private var selectedImage: UIImage?
+                @State private var isShowingImagePicker = false
                 @Binding var reminders: [Reminder]
-
+                
                 var reminder: Reminder
                 var databaseRef: DatabaseReference // Add database reference
 
@@ -236,20 +264,38 @@ struct ContentView: View {
                                 TextField("Title", text: $title)
                                 TextField("Description", text: $description)
                             }
-                            
-                            Section(header: Text("Image")) {
-                                if let selectedImage = selectedImage {
-                                    Image(uiImage: selectedImage)
-                                        .resizable()
-                                        .scaledToFit()
+                        
+                                Section(header: Text("Image")) {
+                                    if let selectedImage = selectedImage {
+                                        Image(uiImage: selectedImage)
+                                            .resizable()
+                                            .scaledToFit()
+                                            .onTapGesture {
+                                                isShowingImagePicker = true
+                                            }
+                                    } else {
+                                        Button(action: {
+                                            isShowingImagePicker = true
+                                        }) {
+                                            Image(systemName: "plus.circle")
+                                                .resizable()
+                                                .aspectRatio(contentMode: .fit)
+                                                .frame(width: 100, height: 100)
+                                                .foregroundColor(.blue)
+                                        }
+                                    }
                                 }
                                 
                                 Button(action: {
                                     // Handle image selection
+                                    isShowingImagePicker = true
                                 }) {
                                     Text("Select Image")
                                 }
-                            }
+                                .sheet(isPresented: $isShowingImagePicker) {
+                                    ImagePickerView(selectedImage: $selectedImage)
+                                }
+
                         }
                         .navigationTitle("Edit Reminder")
                         .navigationBarItems(
@@ -263,6 +309,8 @@ struct ContentView: View {
                         // Assign selectedImage from reminder.image if necessary
                     }
                 }
+                
+                
                 
                 var cancelButton: some View {
                     Button(action: {
@@ -286,6 +334,7 @@ struct ContentView: View {
                       let updatedReminderData: [String: Any] = [
                           "title": title,
                           "description": description,
+                          "isChecked": reminder.isChecked,
                           "timestamp": reminder.timestamp.timeIntervalSince1970,
                           "imageURL": "" // Replace with the URL of the selected image
                       ]
@@ -304,33 +353,44 @@ struct ContentView: View {
                       }
                   }
               }
+            
 
     }
-    
-    var content: some View {
-        List {
-            ForEach(reminders) { reminder in
-                ReminderRow(reminder: reminder, databaseRef: databaseRef, selectedImage: reminder.image, reminders: $reminders)
+    struct ImagePickerView: UIViewControllerRepresentable {
+        @Environment(\.presentationMode) var presentationMode
+        @Binding var selectedImage: UIImage?
+        
+        func makeCoordinator() -> Coordinator {
+            Coordinator(self)
+        }
+        
+        func makeUIViewController(context: Context) -> UIImagePickerController {
+            let imagePickerController = UIImagePickerController()
+            imagePickerController.delegate = context.coordinator
+            return imagePickerController
+        }
+        
+        func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+        
+        class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
+            let parent: ImagePickerView
+            
+            init(_ parent: ImagePickerView) {
+                self.parent = parent
+            }
+            
+            func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
+                if let image = info[.originalImage] as? UIImage {
+                    parent.selectedImage = image
+                }
+                parent.presentationMode.wrappedValue.dismiss()
+            }
+            
+            func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+                parent.presentationMode.wrappedValue.dismiss()
             }
         }
     }
-    
-    var addButton: some View {
-        Button(action: {
-            showAddReminder = true
-        }) {
-            Image(systemName: "plus")
-        }
-    }
-    
-  
-    
-    
-}
-
-    
-  
-   
     struct AddReminderView: View {
         @Environment(\.presentationMode) var presentationMode
         @State private var title = ""
@@ -374,7 +434,7 @@ struct ContentView: View {
                                }
                                
                                Section(header: Text("Reminder Timestamp")) {
-                                   Text("Posted \(timeAgoSince(Date()))")
+                                   Text("Posted at: \(formattedDate(Date()))")
                                        .font(.caption)
                                        .foregroundColor(.secondary)
                                }
@@ -390,41 +450,6 @@ struct ContentView: View {
             }
         }
         
-        struct ImagePickerView: UIViewControllerRepresentable {
-            @Environment(\.presentationMode) var presentationMode
-            @Binding var selectedImage: UIImage?
-            
-            func makeCoordinator() -> Coordinator {
-                Coordinator(self)
-            }
-            
-            func makeUIViewController(context: Context) -> UIImagePickerController {
-                let imagePickerController = UIImagePickerController()
-                imagePickerController.delegate = context.coordinator
-                return imagePickerController
-            }
-            
-            func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
-            
-            class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
-                let parent: ImagePickerView
-                
-                init(_ parent: ImagePickerView) {
-                    self.parent = parent
-                }
-                
-                func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
-                    if let image = info[.originalImage] as? UIImage {
-                        parent.selectedImage = image
-                    }
-                    parent.presentationMode.wrappedValue.dismiss()
-                }
-                
-                func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
-                    parent.presentationMode.wrappedValue.dismiss()
-                }
-            }
-        }
 
         
         var cancelButton: some View {
@@ -455,6 +480,7 @@ struct ContentView: View {
                 "id": reminder.id.uuidString,
                    "title": title,
                    "description": description,
+                    "isChecked": reminder.isChecked ,
                    "timestamp": timestamp,
                    "imageURL": "" // Replace with the URL of the selected image
                ]
@@ -470,6 +496,31 @@ struct ContentView: View {
            }
     }
 
+    var content: some View {
+        List {
+            ForEach(reminders) { reminder in
+                ReminderRow(reminder: reminder, databaseRef: databaseRef, selectedImage: reminder.image, reminders: $reminders)
+            }
+        }
+    }
+    
+    var addButton: some View {
+        Button(action: {
+            showAddReminder = true
+        }) {
+            Image(systemName: "plus")
+        }
+    }
+    
+  
+    
+    
+}
+
+    
+  
+   
+    
 
 // Function to calculate the time ago since a given date
    private func timeAgoSince(_ date: Date) -> String {
@@ -477,6 +528,13 @@ struct ContentView: View {
        formatter.unitsStyle = .full
        return formatter.localizedString(for: date, relativeTo: Date())
    }
+
+private func formattedDate(_ date: Date) -> String {
+    let formatter = DateFormatter()
+    formatter.dateStyle = .medium
+    formatter.timeStyle = .short
+    return formatter.string(from: date)
+}
 
 
 struct ContentView_Previews: PreviewProvider {
